@@ -1,0 +1,20 @@
+# Use /chatid in the chat window to obtain chat id.
+# fallback_chatid should be set to the private chat between you and your bot.
+
+[telegram]
+token = 'your:bot-token'
+allowed_username = 'your-telegram-username'
+fallback_chatid = chatid-of-you-and-your-bot
+
+[irc]
+server = 'chat.freenode.net'
+username = 'irc-username'
+# Don't set password if you didn't register
+password = 'irc-password'
+
+[channel."#channel-name"]
+chatid = corresponding-telegram-chatid
+
+[channel."#a-password-protected-channel"]
+chatid = corresponding-telegram-chatid
+key = "irc-channel-key"
