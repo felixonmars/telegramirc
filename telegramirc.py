@@ -3,12 +3,16 @@ import html
 import logging
 import pydle
 import re
+import sys
 import toml
 from aiogram import Bot, types
 from aiogram.dispatcher import Dispatcher
 from tenacity import retry, stop_after_attempt
 
-config = toml.load("telegramirc.toml")
+if len(sys.argv) > 1:
+    config = toml.load(sys.argv[1])
+else:
+    config = toml.load("telegramirc.toml")
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
@@ -58,14 +62,34 @@ async def telegram_serve():
     async def queue_watch():
         while True:
             try:
+                fwd_msgs = {}
                 target, msg = await tg_q.get()
-                await send_message_with_retry(target, msg)
+                fwd_msgs[target] = msg
+                await asyncio.sleep(0.01)
+                while not tg_q.empty():
+                    target, msg = await tg_q.get()
+                    if target in fwd_msgs:
+                        fwd_msgs[target] += "\n" + msg
+                    else:
+                        fwd_msgs[target] = msg
+            
             except:
-                logging.warning(f"TG Failed to send message: {msg} to {name}", exc_info=True)
+                logging.warning(f"TG Failed to process messages: {str(fwd_msgs)}", exc_info=True)
                 try:
-                    await tg_q.put((config["telegram"]["fallback_chatid"], f"TG Failed to send message: {html.escape(msg)} to {name}"))
+                    await tg_q.put((config["telegram"]["fallback_chatid"], f"TG Failed to process messages: {html.escape(str(fwd_msgs))}"))
                 except:
                     pass
+
+            else:
+                for target in fwd_msgs:
+                    try:
+                        await send_message_with_retry(target, fwd_msgs[target])
+                    except:
+                        logging.warning(f"TG Failed to send message: {fwd_msgs[target]} to {target}", exc_info=True)
+                        try:
+                            await tg_q.put((config["telegram"]["fallback_chatid"], f"TG Failed to send message: {html.escape(fwd_msgs[target])} to {target}"))
+                        except:
+                            pass
 
     asyncio.create_task(queue_watch())
     await dp.start_polling()
