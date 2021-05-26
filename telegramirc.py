@@ -106,9 +106,32 @@ class IRCClient(pydle.Client):
             logging.info(f'IRC Joining channel {channel}')
         asyncio.create_task(self.queue_watch())
 
-    async def on_join(self, channel, user):
-        await super().on_join(channel, user)
-        logging.info(f"IRC Joined channel: {channel} - {user}")
+    async def on_join(self, target, user):
+        await super().on_join(target, user)
+        logging.info(f"IRC Joined channel: {target} - {user}")
+        if config["irc"].get("enable_join_part", False):
+            if target in i2t_map:
+                await tg_q.put((i2t_map[target], f"<b>{user}</b> joined channel."))
+            else:
+                await tg_q.put((config["telegram"]["fallback_chatid"], f"IRC {user} joined {target}."))
+
+    async def on_part(self, target, user, message):
+        await super().on_join(target, user)
+        logging.info(f"IRC Left channel: {target} - {user} ({message})")
+        if config["irc"].get("enable_join_part", False):
+            if target in i2t_map:
+                await tg_q.put((i2t_map[target], f"<b>{user}</b> left channel ({message})."))
+            else:
+                await tg_q.put((config["telegram"]["fallback_chatid"], f"IRC {user} left {target} ({message})."))
+
+    async def on_kick(self, target, user, by, reason):
+        await super().on_join(target, user)
+        logging.info(f"IRC Left channel: {target} - {user} (kicked by {by}: {reason})")
+        if config["irc"].get("enable_join_part", False):
+            if target in i2t_map:
+                await tg_q.put((i2t_map[target], f"<b>{user}</b> left channel (kicked by {by}: {reason})."))
+            else:
+                await tg_q.put((config["telegram"]["fallback_chatid"], f"IRC {user} left {target} (kicked by {by}: {reason})."))
 
     async def on_message(self, target, by, message):
         await super().on_message(target, by, message)

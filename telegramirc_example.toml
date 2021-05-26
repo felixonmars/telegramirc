@@ -11,6 +11,7 @@ server = 'chat.freenode.net'
 username = 'irc-username'
 # Don't set password if you didn't register
 password = 'irc-password'
+enable_join_part = false
 
 [channel."#channel-name"]
 chatid = corresponding-telegram-chatid
