@@ -11,6 +11,8 @@ server = 'chat.freenode.net'
 username = 'irc-username'
 # Don't set password if you didn't register
 password = 'irc-password'
+# Set this for OFTC. Comment out to skip sending auth msg to nickserv
+# nickserv_password_first = true
 enable_join_part = false
 
 [channel."#channel-name"]

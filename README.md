@@ -34,6 +34,5 @@ Usage
 TODO
 ====
 
-- [ ] Auto-login for OFTC (different message format than Libera.chat)
 - [ ] List online users in channel
 - [ ] DCC File transfer and other IRC extensions

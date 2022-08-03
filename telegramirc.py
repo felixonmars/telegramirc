@@ -107,9 +107,18 @@ class IRCClient(pydle.Client):
     async def on_connect(self):
         await super().on_connect()
         logging.info('IRC Connected')
+
+        if "nickserv_password_first" in config["irc"]:
+            if config["irc"]["nickserv_password_first"]:
+                await self.message("NICKSERV", f"identify {config['irc']['password']} {config['irc']['username']}")
+            else:
+                await self.message("NICKSERV", f"identify {config['irc']['username']} {config['irc']['password']}")
+            logging.info('IRC NickServ Identify Attempted')
+
         for channel in config["channel"]:
             await self.join(channel, config["channel"][channel].get("key", None))
             logging.info(f'IRC Joining channel {channel}')
+
         asyncio.create_task(self.queue_watch())
 
     async def on_join(self, target, user):
