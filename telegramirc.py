@@ -103,6 +103,7 @@ async def telegram_serve():
 
 class IRCClient(pydle.Client):
     READ_TIMEOUT = 30
+    AUTH_FLAG = False
 
     async def on_connect(self):
         await super().on_connect()
@@ -115,11 +116,15 @@ class IRCClient(pydle.Client):
                 await self.message("NICKSERV", f"identify {config['irc']['username']} {config['irc']['password']}")
             logging.info('IRC NickServ Identify Attempted')
 
+        asyncio.create_task(self.queue_watch())
+
+        if "wait_for_auth" in config["irc"]:
+            while not self.AUTH_FLAG:
+                await asyncio.sleep(1)
+
         for channel in config["channel"]:
             await self.join(channel, config["channel"][channel].get("key", None))
             logging.info(f'IRC Joining channel {channel}')
-
-        asyncio.create_task(self.queue_watch())
 
     async def on_join(self, target, user):
         await super().on_join(target, user)
@@ -172,6 +177,11 @@ class IRCClient(pydle.Client):
         await super().on_notice(target, by, message)
         if by == self.nickname:
             return
+
+        if "wait_for_auth" in config["irc"] and by.lower() == "nickserv":
+            if config["irc"]["wait_for_auth"] in message:
+                logging.info('IRC NickServ Identify Successful')
+                self.AUTH_FLAG = True
 
         logging.info(f'IRC NOTICE {target} {by}: {message}')
         if target == self.nickname:
