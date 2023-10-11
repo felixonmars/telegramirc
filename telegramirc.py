@@ -53,8 +53,16 @@ async def telegram_serve():
     @dp.message_handler()
     async def handler(message):
         logging.info(f'TG {message.chat.id} {message.from_user.username}: {message.text}')
+        text = message.text
+        if message.reply_to_message:
+            reply_to_text = message.reply_to_message.text[:40]
+            if len(message.reply_to_message.text) > 40:
+                reply_to_text += "..."
+            if not reply_to_text.startswith("<"):  # own message
+                reply_to_text = f"<{message.reply_to_message.from_user.username}> {reply_to_text}"
+            text = f"\"{reply_to_text}\" <- {text}"
         if message.from_user.username == config["telegram"]["allowed_username"]:
-            await irc_q.put((t2i_map[message.chat.id], message.text))
+            await irc_q.put((t2i_map[message.chat.id], text))
 
     @retry(stop=stop_after_attempt(20), reraise=True)
     async def send_message_with_retry(*arg, **kwargs):
