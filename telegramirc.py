@@ -5,9 +5,10 @@ import pydle
 import re
 import sys
 import toml
-from aiogram import Bot, types
-from aiogram.dispatcher import Dispatcher
-from aiogram.utils.exceptions import MessageIsTooLong
+from aiogram import Bot, Dispatcher, Router
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+from aiogram.filters import Command
 from tenacity import retry, stop_after_attempt
 
 if len(sys.argv) > 1:
@@ -25,32 +26,32 @@ t2i_map = {chatid: channel for channel, chatid in i2t_map.items()}
 
 
 async def telegram_serve():
-    bot = Bot(token=config["telegram"]["token"], parse_mode=types.ParseMode.HTML)
-    dp = Dispatcher(bot)
+    bot = Bot(token=config["telegram"]["token"], default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    router = Router()
 
-    @dp.message_handler(commands='start')
+    @router.message(Command('start'))
     async def start(message):
         await message.reply("I'm a bot, please don't talk to me!")
 
-    @dp.message_handler(commands='chatid')
+    @router.message(Command('chatid'))
     async def chatid(message):
         await message.reply(str(message.chat.id))
 
-    @dp.message_handler(commands='msg')
+    @router.message(Command('msg'))
     async def msg(message):
         _, target, msg = message.text.split(" ", 2)
         logging.info(f'TG DM {message.chat.id} {target}: {msg}')
         if message.from_user.username == config["telegram"]["allowed_username"]:
             await irc_q.put((target, msg))
 
-    @dp.message_handler(commands='me')
+    @router.message(Command('me'))
     async def me(message):
         _, msg = message.text.split(" ", 1)
         logging.info(f'TG {message.chat.id} {message.from_user.username} ACTION {msg}')
         if message.from_user.username == config["telegram"]["allowed_username"]:
             await irc_q.put((t2i_map[message.chat.id], ("ACTION", msg)))
 
-    @dp.message_handler()
+    @router.message()
     async def handler(message):
         logging.info(f'TG {message.chat.id} {message.from_user.username}: {message.text}')
         text = message.text
@@ -93,8 +94,8 @@ async def telegram_serve():
                 for target in fwd_msgs:
                     try:
                         await send_message_with_retry(target, fwd_msgs[target])
-                    except MessageIsTooLong:
-                        logging.warning(f"TG Failed to send message: {fwd_msgs[target]} to {target}, possible loop detected, disabled retrying.", exc_info=True)
+                    # except MessageIsTooLong:
+                    #     logging.warning(f"TG Failed to send message: {fwd_msgs[target]} to {target}, possible loop detected, disabled retrying.", exc_info=True)
                     except:
                         logging.warning(f"TG Failed to send message: {fwd_msgs[target]} to {target}", exc_info=True)
                         if target == config["telegram"]["fallback_chatid"] and "TG Failed to send message" in fwd_msgs[target]:
@@ -106,7 +107,10 @@ async def telegram_serve():
                                 pass
 
     asyncio.create_task(queue_watch())
-    await dp.start_polling()
+
+    dp = Dispatcher()
+    dp.include_router(router)
+    await dp.start_polling(bot)
 
 
 class IRCClient(pydle.Client):
