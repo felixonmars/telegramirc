@@ -3,6 +3,7 @@ import html
 import logging
 import pydle
 import re
+import signal
 import sys
 import toml
 from aiogram import Bot, Dispatcher, Router
@@ -23,6 +24,8 @@ irc_q = asyncio.Queue()
 tg_q = asyncio.Queue()
 i2t_map = {channel: config["channel"][channel]["chatid"] for channel in config["channel"]}
 t2i_map = {chatid: channel for channel, chatid in i2t_map.items()}
+
+irc_client = None
 
 
 async def telegram_serve():
@@ -83,11 +86,11 @@ async def telegram_serve():
                     else:
                         fwd_msgs[target] = msg
 
-            except:
+            except Exception:
                 logging.warning(f"TG Failed to process messages: {str(fwd_msgs)}", exc_info=True)
                 try:
                     await tg_q.put((config["telegram"]["fallback_chatid"], f"TG Failed to process messages: {html.escape(str(fwd_msgs))}"))
-                except:
+                except Exception:
                     pass
 
             else:
@@ -96,21 +99,21 @@ async def telegram_serve():
                         await send_message_with_retry(target, fwd_msgs[target])
                     # except MessageIsTooLong:
                     #     logging.warning(f"TG Failed to send message: {fwd_msgs[target]} to {target}, possible loop detected, disabled retrying.", exc_info=True)
-                    except:
+                    except Exception:
                         logging.warning(f"TG Failed to send message: {fwd_msgs[target]} to {target}", exc_info=True)
                         if target == config["telegram"]["fallback_chatid"] and "TG Failed to send message" in fwd_msgs[target]:
                             logging.warning(f"TG Failed to send fallback message.")
                         else:
                             try:
                                 await tg_q.put((config["telegram"]["fallback_chatid"], f"TG Failed to send message: {html.escape(fwd_msgs[target])} to {target}"))
-                            except:
+                            except Exception:
                                 pass
 
     asyncio.create_task(queue_watch())
 
     dp = Dispatcher()
     dp.include_router(router)
-    await dp.start_polling(bot)
+    await dp.start_polling(bot, handle_signals=False)
 
 
 class IRCClient(pydle.Client):
@@ -219,31 +222,51 @@ class IRCClient(pydle.Client):
                     await self.ctcp(name, *msg)
                 else:
                     await self.message(name, msg)
-            except:
+            except Exception:
                 logging.warning(f"IRC Failed to send message: {msg} to {name}", exc_info=True)
                 try:
                     await tg_q.put((config["telegram"]["fallback_chatid"], f"IRC Failed to send message: {html.escape(msg)} to {name}"))
-                except:
+                except Exception:
                     pass
 
 
 async def irc_serve():
+    global irc_client
     if config["irc"].get("password", None):
-        client = IRCClient(
+        irc_client = IRCClient(
             config["irc"]["username"],
             sasl_username=config["irc"]["username"],
             sasl_password=config["irc"]["password"],
             sasl_identity=config["irc"]["username"]
         )
     else:
-        client = IRCClient(config["irc"]["username"])
+        irc_client = IRCClient(config["irc"]["username"])
 
-    await client.connect(config["irc"]["server"], tls=True, tls_verify=True)
+    await irc_client.connect(config["irc"]["server"], tls=True, tls_verify=True)
 
 
 async def main():
+    loop = asyncio.get_running_loop()
+    stop = asyncio.Event()
+
+    def _signal_handler(signum, _frame):
+        logging.info(f'Signal {signal.Signals(signum).name} received')
+        loop.call_soon_threadsafe(stop.set)
+
+    signal.signal(signal.SIGINT, _signal_handler)
+    signal.signal(signal.SIGTERM, _signal_handler)
+
     await irc_serve()
-    await telegram_serve()
+    tg_task = asyncio.create_task(telegram_serve())
+    await stop.wait()
+
+    logging.info('Shutdown signal received, disconnecting IRC...')
+    if irc_client is not None:
+        try:
+            await irc_client.quit('Shutting down')
+        except Exception:
+            logging.warning('IRC graceful disconnect failed', exc_info=True)
+    tg_task.cancel()
 
 
 if __name__ == '__main__':
