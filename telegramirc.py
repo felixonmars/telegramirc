@@ -19,8 +19,8 @@ else:
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 
-irc_q = asyncio.Queue()
-tg_q = asyncio.Queue()
+irc_q = asyncio.Queue(maxsize=2000)
+tg_q = asyncio.Queue(maxsize=2000)
 i2t_map = {channel: config["channel"][channel]["chatid"] for channel in config["channel"]}
 t2i_map = {chatid: channel for channel, chatid in i2t_map.items()}
 
