@@ -148,7 +148,7 @@ class IRCClient(pydle.Client):
                 await tg_q.put((config["telegram"]["fallback_chatid"], f"IRC {user} joined {target}."))
 
     async def on_part(self, target, user, message):
-        await super().on_join(target, user)
+        await super().on_part(target, user, message)
         logging.info(f"IRC Left channel: {target} - {user} ({message})")
         if config["irc"].get("enable_join_part", False):
             if target in i2t_map:
@@ -157,7 +157,7 @@ class IRCClient(pydle.Client):
                 await tg_q.put((config["telegram"]["fallback_chatid"], f"IRC {user} left {target} ({message})."))
 
     async def on_kick(self, target, user, by, reason):
-        await super().on_join(target, user)
+        await super().on_kick(target, user, by, reason)
         logging.info(f"IRC Left channel: {target} - {user} (kicked by {by}: {reason})")
         if config["irc"].get("enable_join_part", False):
             if target in i2t_map:
