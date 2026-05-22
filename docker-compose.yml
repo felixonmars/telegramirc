@@ -1,0 +1,15 @@
+services:
+  telegramirc:
+    build: .
+    image: telegramirc:latest
+    container_name: telegramirc
+    restart: unless-stopped
+    volumes:
+      - ./config:/config:ro
+    mem_limit: 256m
+    stop_grace_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -1,0 +1,10 @@
+.git
+.gitignore
+.venv
+__pycache__
+*.pyc
+config
+telegramirc.toml
+telegramirc.toml.*
+ANALYSIS.md
+.claude
