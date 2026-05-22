@@ -1,0 +1,4 @@
+aiogram>=3.7,<4
+pydle>=0.9.4,<2
+tenacity>=8
+toml>=0.10

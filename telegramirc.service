@@ -1,0 +1,29 @@
+[Unit]
+Description=Telegram <-> IRC bridge
+Documentation=https://github.com/felixonmars/telegramirc
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=telegramirc
+Group=telegramirc
+WorkingDirectory=/opt/telegramirc
+ExecStart=/opt/telegramirc/.venv/bin/python telegramirc.py telegramirc.toml
+Restart=on-failure
+RestartSec=10s
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+
+[Install]
+WantedBy=multi-user.target
